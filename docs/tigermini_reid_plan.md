@@ -200,12 +200,12 @@ loss:
 train:
   optim: 'amsgrad'
   lr: 0.0003
-  max_epoch: 60
+  max_epoch: 3
   batch_size: 32
-  fixbase_epoch: 5
+  fixbase_epoch: 0
   open_layers: ['classifier']
   lr_scheduler: 'single_step'
-  stepsize: [20]
+  stepsize: [2]
   print_freq: 10
 
 test:
@@ -225,7 +225,9 @@ test:
 2. `pretrained=True` 会使用预训练 ResNet 权重，更适合 TigerMini 这种小数据集。
 3. batch_size 先用 32，比较稳。
 4. workers 在 Windows 上先设为 0，减少多进程 DataLoader 问题。
-5. `eval_freq=-1` 表示训练结束后评估一次，先把完整流程跑通。
+5. `max_epoch=3` 是本次验收用的短跑配置；跑通后再扩展到 60 epoch。
+6. `fixbase_epoch=0` 可以避免 3 个 epoch 全部只训练分类头。
+7. `eval_freq=-1` 表示训练结束后评估一次，先把完整流程跑通。
 ```
 
 ## 6. 训练命令
@@ -275,7 +277,7 @@ log/resnet50_tigermini_softmax/model/
 假设最佳或最后 checkpoint 是：
 
 ```text
-log/resnet50_tigermini_softmax/model/model.pth.tar-60
+log/resnet50_tigermini_softmax/model/model.pth.tar-3
 ```
 
 只评估命令：
@@ -284,7 +286,7 @@ log/resnet50_tigermini_softmax/model/model.pth.tar-60
 F:\Users\ROG\anaconda3\envs\xiaotudui\python.exe scripts\main.py `
   --config-file configs\im_r50_softmax_256x128_tigermini.yaml `
   --root reid-data `
-  model.load_weights log\resnet50_tigermini_softmax\model\model.pth.tar-60 `
+  model.load_weights log\resnet50_tigermini_softmax\model\model.pth.tar-3 `
   test.evaluate True `
   test.batch_size 100 `
   data.save_dir log\resnet50_tigermini_eval
@@ -306,7 +308,7 @@ Rank-10
 ```text
 1. 数据集能被注册为 tigermini。
 2. DataManager 能打印出正确的 train/query/gallery 数量。
-3. 能完成至少 1 个 epoch 训练。
+3. 能完成 3 个 epoch 训练。
 4. 能完成一次 query-gallery 评估。
 5. 输出 mAP 和 CMC Rank 指标。
 ```
@@ -390,8 +392,8 @@ top-10 图片路径、距离分数、可视化结果图。
 2. 在 image/__init__.py 导出 TigerMini。
 3. 在 datasets/__init__.py 注册 'tigermini'。
 4. 基于 ResNet 配置新增 configs/im_r50_softmax_256x128_tigermini.yaml。
-5. 先运行 1 个 epoch 验证数据读取和训练流程。
-6. 跑完整 60 epoch ResNet 基线训练。
+5. 先运行 3 个 epoch 验证数据读取、训练和评估流程。
+6. 跑通后再扩展到 60 epoch ResNet 基线训练。
 7. 只评估 best/last checkpoint。
 8. 开启 visrank 或自写 top-k 检索脚本查看结果。
 9. 根据错误样例调整数据清洗、camid 标注和训练配置。
@@ -404,4 +406,51 @@ top-10 图片路径、距离分数、可视化结果图。
 2. 当前已假定 video_XXX 是老虎个体 ID；如果后续发现它只是视频编号，需要重新标注真实个体 ID。
 3. query/gallery 是否同源：如果来自同一段视频的相邻帧，指标可能虚高。
 4. 小数据集过拟合：训练集 302 个身份、3557 张图，建议优先用预训练模型和较小学习率。
+```
+
+## 13. 本次执行结果
+
+执行日期：2026-07-10
+
+已完成：
+
+```text
+1. 新增 TigerMini 数据集类。
+2. 注册数据集名称 tigermini。
+3. 新增 ResNet50/TigerMini 配置文件。
+4. 完成 3 个 epoch 训练。
+5. 完成 query-gallery 最终评估。
+```
+
+训练命令：
+
+```powershell
+F:\Users\ROG\anaconda3\envs\xiaotudui\python.exe scripts\main.py `
+  --config-file configs\im_r50_softmax_256x128_tigermini.yaml `
+  --root reid-data
+```
+
+训练输出：
+
+```text
+checkpoint : log/resnet50_tigermini_softmax\model\model.pth.tar-3
+log file   : log/resnet50_tigermini_softmax\train.log-2026-07-10-10-33-49
+```
+
+最终评估结果：
+
+```text
+mAP     : 86.0%
+Rank-1  : 96.8%
+Rank-5  : 98.8%
+Rank-10 : 99.3%
+Rank-20 : 99.8%
+```
+
+备注：
+
+```text
+1. Windows 环境下 collect_env_info 返回异常，已在 scripts/main.py 中改为捕获通用异常，避免诊断信息阻断训练。
+2. Cython rank evaluation 当前不可用，评估自动使用 Python 实现，结果可正常输出。
+3. 训练产物位于 log/ 下，已被 .gitignore 忽略。
 ```

@@ -1,0 +1,39 @@
+model:
+  name: 'resnet50_fc512'
+  pretrained: True
+
+data:
+  type: 'image'
+  sources: ['tigermini']
+  targets: ['tigermini']
+  height: 256
+  width: 128
+  combineall: False
+  transforms: ['random_flip']
+  save_dir: 'log/resnet50_tigermini_softmax'
+  workers: 0
+
+loss:
+  name: 'softmax'
+  softmax:
+    label_smooth: True
+
+train:
+  optim: 'amsgrad'
+  lr: 0.0003
+  max_epoch: 3
+  batch_size: 32
+  fixbase_epoch: 0
+  open_layers: ['classifier']
+  lr_scheduler: 'single_step'
+  stepsize: [2]
+  print_freq: 10
+
+test:
+  batch_size: 100
+  dist_metric: 'euclidean'
+  normalize_feature: False
+  evaluate: False
+  eval_freq: -1
+  rerank: False
+  ranks: [1, 5, 10, 20]

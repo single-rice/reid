@@ -150,8 +150,8 @@ def main():
     print('Collecting env info ...')
     try:
         env_info = collect_env_info()
-    except UnicodeDecodeError as e:
-        env_info = 'collect_env_info failed on Windows encoding: {}'.format(e)
+    except Exception as e:
+        env_info = 'collect_env_info failed: {}'.format(e)
     print('** System info **\n{}\n'.format(env_info))
 
     if cfg.use_gpu:
@@ -202,4 +202,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
