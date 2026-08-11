@@ -55,19 +55,19 @@ class ImageSoftmaxEngine(Engine):
 
     def __init__(
         self,
-        datamanager,
+        datamanager,#这是一个数据管理器对象，负责管理训练和验证数据集，和数据加载器等相关信息
         model,
         optimizer,
-        scheduler=None,
+        scheduler=None,#这是一个学习率调度器对象，用于在训练过程中动态调整学习率。如果为None，则不进行学习率衰减。
         use_gpu=True,
-        label_smooth=True
+        label_smooth=True#使用标签平滑正则化技术来缓解过拟合问题。如果为True，则在计算交叉熵损失时会对标签进行平滑处理。
     ):
         super(ImageSoftmaxEngine, self).__init__(datamanager, use_gpu)
 
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
-        self.register_model('model', model, optimizer, scheduler)
+        self.register_model('model', model, optimizer, scheduler)#这是一个方法调用，用于注册模型、优化器和学习率调度器，以便在训练过程中进行管理和保存。
 
         self.criterion = CrossEntropyLoss(
             num_classes=self.datamanager.num_train_pids,

@@ -92,7 +92,7 @@ class DataManager(object):
 
 
 class ImageDataManager(DataManager):
-    r"""Image data manager.
+    r"""Image data manager.图像数据管理器
 
     Args:
         root (str): root path to datasets.
@@ -151,6 +151,51 @@ class ImageDataManager(DataManager):
         test_loader = datamanager.test_loader
 
         # return train loader of target data
+        train_loader_t = datamanager.train_loader_t
+
+        
+        root (str)：数据集存放根目录
+        sources (str / list)：源域训练数据集名称（一个或多个）
+        targets (str / list, 可选)：目标域测试数据集；若不指定则与sources相同
+        height (int, 可选)：图像统一缩放高度，默认256
+        width (int, 可选)：图像统一缩放宽度，默认128
+        transforms (str / 字符串列表, 可选)：训练时使用的数据增强策略，默认仅随机水平翻转
+        k_tfm (int)：单张原图独立执行增强的次数；大于1时会生成多张不同增强视图，仅训练阶段、图像数据集生效
+        norm_mean (list / None, 可选)：归一化均值；为空则默认使用ImageNet均值
+        norm_std (list / None, 可选)：归一化方差；为空则默认使用ImageNet方差
+        use_gpu (bool, 可选)：是否使用GPU加载数据，默认开启
+        split_id (int, 可选)：数据集划分序号，从0开始计数，默认0
+        combineall (bool, 可选)：是否把训练集、查询集、图库全部合并当作训练数据，默认关闭
+        load_train_targets (bool, 可选)：是否为目标域数据集构建训练加载器，默认关闭；域自适应实验专用
+        batch_size_train (int, 可选)：训练批次大小，默认32
+        batch_size_test (int, 可选)：测试批次大小，默认32
+        workers (int, 可选)：DataLoader多线程读取进程数，默认4
+        num_instances (int, 可选)：单批次内每个行人ID采样图片数量，仅RandomIdentitySampler生效，默认4
+        num_cams (int, 可选)：单批次采样摄像头数量，仅RandomDomainSampler生效，默认1
+        num_datasets (int, 可选)：单批次采样数据集数量，仅RandomDatasetSampler生效，默认1
+        train_sampler (str, 可选)：源域训练集采样器，默认普通随机采样RandomSampler
+        train_sampler_t (str, 可选)：目标域训练集采样器，默认普通随机采样RandomSampler
+        cuhk03_labeled (bool, 可选)：CUHK03数据集是否使用人工标注框图片；默认False，使用检测器检测框图片
+        cuhk03_classic_split (bool, 可选)：CUHK03是否使用论文经典划分协议，默认关闭
+        market1501_500k (bool, 可选)：Market1501图库是否额外加入50万干扰行人图片，默认关闭
+
+    使用示例::
+        datamanager = torchreid.data.ImageDataManager(
+            root='path/to/reid-data',
+            sources='market1501',
+            height=256,
+            width=128,
+            batch_size_train=32,
+            batch_size_test=100
+        )
+
+        # 获取源域训练数据加载器
+        train_loader = datamanager.train_loader
+
+        # 获取目标域测试加载器（query+gallery）
+        test_loader = datamanager.test_loader
+
+        # 获取目标域训练加载器（域自适应场景使用）
         train_loader_t = datamanager.train_loader_t
     """
     data_type = 'image'

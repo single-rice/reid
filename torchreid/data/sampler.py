@@ -18,6 +18,12 @@ class RandomIdentitySampler(Sampler):
         data_source (list): contains tuples of (img_path(s), pid, camid, dsetid).
         batch_size (int): batch size.
         num_instances (int): number of instances per identity in a batch.
+    随机采样 N 个行人身份，每个身份采样 K 张图片。
+
+    参数说明：
+        data_source (list): 数据集列表，每个元素为元组 (图片路径, 行人ID, 摄像头ID, 数据集编号)
+        batch_size (int): 批次总样本数量
+        num_instances (int): 单个行人身份在一个批次内采样的图片数量
     """
 
     def __init__(self, data_source, batch_size, num_instances):
@@ -95,6 +101,20 @@ class RandomDomainSampler(Sampler):
         data_source (list): contains tuples of (img_path(s), pid, camid, dsetid).
         batch_size (int): batch size.
         n_domain (int): number of cameras to sample in a batch.
+        
+    随机域采样器
+
+    本采样器将每一个摄像头视作一个独立视觉域。
+
+    采样流程：
+    1. 基于摄像头编号 camid，随机抽取 N 个不同摄像头；
+    2. 从选中的每个摄像头中，随机抽取 K 张图片。
+
+    参数说明：
+        data_source (list): 数据集列表，每条数据元组格式 (图片路径, 行人ID, 摄像头ID, 数据集编号)
+        batch_size (int): 批次总图片数量
+        n_domain (int): 单个批次内采样的摄像头（域）数量
+
     """
 
     def __init__(self, data_source, batch_size, n_domain):
@@ -154,6 +174,16 @@ class RandomDatasetSampler(Sampler):
         data_source (list): contains tuples of (img_path(s), pid, camid, dsetid).
         batch_size (int): batch size.
         n_dataset (int): number of datasets to sample in a batch.
+        多数据集随机采样器
+
+    采样流程：
+    1. 根据数据集编号 dsetid，随机选取 N 个不同数据集；
+    2. 从选中的每个数据集里随机抽取 K 张图片。
+
+    参数说明：
+        data_source (list): 数据列表，每条是元组 (图片路径, 行人ID, 摄像头ID, 数据集编号)
+        batch_size (int): 批次总样本数
+        n_dataset (int): 一个批次内要采样的数据集个数
     """
 
     def __init__(self, data_source, batch_size, n_dataset):
@@ -223,11 +253,23 @@ def build_train_sampler(
             ``RandomDomainSampler``). Default is 1.
         num_datasets (int, optional): number of datasets to sample in a batch (when
             using ``RandomDatasetSampler``). Default is 1.
+    构建训练集采样器
+
+    参数说明：
+        data_source (list): 训练数据列表，每条为元组 (图片路径, 行人ID, 摄像头ID)
+        train_sampler (str): 采样器名称，默认 RandomSampler（普通随机采样）
+        batch_size (int, 可选): 批次大小，默认32
+        num_instances (int, 可选):
+            每个行人ID在单批次内采样图片数量，仅 RandomIdentitySampler 生效，默认4
+        num_cams (int, 可选):
+            单批次采样摄像头数量，仅 RandomDomainSampler 生效，默认1
+        num_datasets (int, 可选):
+            单批次采样数据集数量，仅 RandomDatasetSampler 生效，默认1
     """
     assert train_sampler in AVAI_SAMPLERS, \
         'train_sampler must be one of {}, but got {}'.format(AVAI_SAMPLERS, train_sampler)
 
-    if train_sampler == 'RandomIdentitySampler':
+    if train_sampler == 'RandomIdentitySampler':#按行人身份采样（ReID三元组训练标配）
         sampler = RandomIdentitySampler(data_source, batch_size, num_instances)
 
     elif train_sampler == 'RandomDomainSampler':
@@ -236,10 +278,10 @@ def build_train_sampler(
     elif train_sampler == 'RandomDatasetSampler':
         sampler = RandomDatasetSampler(data_source, batch_size, num_datasets)
 
-    elif train_sampler == 'SequentialSampler':
+    elif train_sampler == 'SequentialSampler':#顺序采样（不打乱，按文件顺序读取）
         sampler = SequentialSampler(data_source)
 
-    elif train_sampler == 'RandomSampler':
+    elif train_sampler == 'RandomSampler':#普通随机打乱，不限制身份 / 摄像头 / 数据集，标准分类任务用，不能用于三元组损失训练。
         sampler = RandomSampler(data_source)
 
     return sampler

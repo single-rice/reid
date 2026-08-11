@@ -4,35 +4,44 @@ model:
 
 data:
   type: 'image'
-  sources: ['market1501']
-  targets: ['market1501']
+  sources: ['atrw']
+  targets: ['atrw']
   height: 256
   width: 128
   combineall: False
   transforms: ['random_flip']
-  save_dir: 'log/resnet50_fc512_market1501_softmax'
+  save_dir: 'log/resnet50_atrw_triplet_softmax'
+  workers: 0
 
 loss:
-  name: 'softmax'
+  name: 'triplet'
   softmax:
     label_smooth: True
+  triplet:
+    margin: 0.3
+    weight_t: 1.0
+    weight_x: 1.0
+
+sampler:
+  train_sampler: 'RandomIdentitySampler'
+  num_instances: 4
 
 train:
   optim: 'amsgrad'
   lr: 0.0003
   max_epoch: 60
   batch_size: 32
-  #前 fixbase_epoch 轮：backbone 冻结，
-  #只更新 open_layers（分类头、注意力、neck 等随机初始化模块）
-  fixbase_epoch: 5
-  open_layers: ['fc', 'classifier']
+  fixbase_epoch: 0
+  open_layers: ['classifier']
   lr_scheduler: 'single_step'
   stepsize: [20]
+  print_freq: 10
 
 test:
   batch_size: 100
   dist_metric: 'euclidean'
   normalize_feature: False
   evaluate: False
-  eval_freq: -1
+  eval_freq: 1
   rerank: False
+  ranks: [1, 5, 10, 20]

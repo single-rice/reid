@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from .radam import RAdam
 
-AVAI_OPTIMS = ['adam', 'amsgrad', 'sgd', 'rmsprop', 'radam']
+AVAI_OPTIMS = ['adam', 'amsgrad', 'sgd', 'rmsprop', 'radam', 'adamw']
 
 
 def build_optimizer(
@@ -62,6 +62,42 @@ def build_optimizer(
         >>>     model, optim='sgd', lr=0.01, staged_lr=True,
         >>>     new_layers=['fc', 'classifier'], base_lr_mult=0.1
         >>> )
+    优化器构建工具包装函数
+
+    参数说明：
+        model (nn.Module): 待训练的网络模型
+        optim (str, 可选): 优化器类型，默认 "adam"
+        lr (float, 可选): 基础学习率，默认 0.0003
+        weight_decay (float, 可选): 权重衰减（L2正则惩罚系数），默认 5e-04
+        momentum (float, 可选): SGD优化器的动量系数，默认 0.9
+        sgd_dampening (float, 可选): SGD动量的阻尼系数，默认 0
+        sgd_nesterov (bool, 可选): 是否开启Nesterov加速动量，默认 False
+        rmsprop_alpha (float, 可选): RMSprop平滑系数，默认 0.99
+        adam_beta1 (float, 可选): Adam一阶动量系数 β1，默认 0.9
+        adam_beta2 (float, 可选): Adam二阶动量系数 β2，默认 0.99
+        staged_lr (bool, 可选): 是否启用分层学习率策略。
+            骨干层为预训练权重，新增层（如行人分类头）为随机初始化；
+            开启后骨干层学习率 = lr * base_lr_mult，新增层使用完整lr。默认关闭。
+        new_layers (str / list): 模型中新增层的属性名，默认为空
+        base_lr_mult (float, 可选): 骨干网络学习率缩放倍数，默认 0.1
+
+    使用示例::
+        >>> # 普通优化器构建方式
+        >>> optimizer = torchreid.optim.build_optimizer(model, optim='sgd', lr=0.01)
+
+        >>> # 想给预训练骨干设置更小学习率，随机初始化层名为 classifier
+        >>> optimizer = torchreid.optim.build_optimizer(
+        >>>     model, optim='sgd', lr=0.01, staged_lr=True,
+        >>>     new_layers='classifier', base_lr_mult=0.1
+        >>> )
+        >>> # 此时 classifier 层学习率为 0.01，骨干网络学习率为 0.01 * 0.1
+
+        >>> # 多组新增层：fc、classifier 都使用完整学习率
+        >>> optimizer = torchreid.optim.build_optimizer(
+        >>>     model, optim='sgd', lr=0.01, staged_lr=True,
+        >>>     new_layers=['fc', 'classifier'], base_lr_mult=0.1
+        >>> )
+
     """
     if optim not in AVAI_OPTIMS:
         raise ValueError(
@@ -74,8 +110,9 @@ def build_optimizer(
         raise TypeError(
             'model given to build_optimizer must be an instance of nn.Module'
         )
-
+    #  开启分层学习率 staged_lr=True 分支
     if staged_lr:
+        # 如果new_layers传的是单个字符串，转成列表统一处理
         if isinstance(new_layers, str):
             if new_layers is None:
                 warnings.warn(
@@ -153,5 +190,13 @@ def build_optimizer(
             weight_decay=weight_decay,
             betas=(adam_beta1, adam_beta2)
         )
-
+        
+    elif optim == 'adamw':
+        # AdamW 使用 torch.optim.AdamW，传参逻辑和Adam保持一致
+        optimizer = torch.optim.AdamW(
+            param_groups,
+            lr=lr,
+            weight_decay=weight_decay,
+            betas=(adam_beta1, adam_beta2),
+        )
     return optimizer

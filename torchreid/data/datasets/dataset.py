@@ -27,6 +27,21 @@ class Dataset(object):
         combineall (bool): combines train, query and gallery in a
             dataset for training.
         verbose (bool): show information.
+        数据集抽象基类
+
+        该类是 ImageDataset（图像数据集）与 VideoDataset（视频数据集）的父类。
+
+        参数说明：
+        train (list)：训练集数据列表，每个元素为元组格式 (图片路径, 行人ID, 摄像头ID)
+        query (list)：查询集数据列表，每个元素为元组格式 (图片路径, 行人ID, 摄像头ID)
+        gallery (list)：图库集数据列表，每个元素为元组格式 (图片路径, 行人ID, 摄像头ID)
+        transform：图像预处理/数据增强变换函数
+        k_tfm (int)：单张图片独立执行增强操作的次数。
+            若 k_tfm > 1，同一张图片会经过 k_tfm 次不同随机增强，生成多张变体样本。
+            该参数仅训练阶段生效，目前仅支持图像数据集。
+        mode (str)：数据集模式，可选值 'train'（训练集）、'query'（查询集）、'gallery'（图库集）
+        combineall (bool)：是否将训练集、查询集、图库全部合并为一份训练数据
+        verbose (bool)：是否打印数据集加载详情信息
     """
 
     # junk_pids contains useless person IDs, e.g. background,
@@ -317,7 +332,15 @@ class ImageDataset(Dataset):
     where ``img`` has shape (channel, height, width). As a result,
     data in each batch has shape (batch_size, channel, height, width).
     """
+    """图像数据集基类
 
+    所有其他图像数据集都需要继承该类。
+
+    通过索引调用 __getitem__ 会返回一张图像对应的全部数据。
+    返回内容包含：图像 img、行人ID pid、摄像头编号 camid、图片路径 img_path。
+    其中 img 的维度格式为 (通道数, 高度, 宽度)。
+    因此每一批次数据整体维度为 (batch_size, 通道数, 高度, 宽度)。
+    """
     def __init__(self, train, query, gallery, **kwargs):
         super(ImageDataset, self).__init__(train, query, gallery, **kwargs)
 

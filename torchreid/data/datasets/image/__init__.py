@@ -4,6 +4,7 @@ from .grid import GRID
 from .prid import PRID
 from .ilids import iLIDS
 from .viper import VIPeR
+from .atrw import ATRW
 from .cuhk01 import CUHK01
 from .cuhk02 import CUHK02
 from .cuhk03 import CUHK03
