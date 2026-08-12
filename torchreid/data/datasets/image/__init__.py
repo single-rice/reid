@@ -13,5 +13,6 @@ from .cuhksysu import CUHKSYSU
 from .sensereid import SenseReID
 from .market1501 import Market1501
 from .tigermini import TigerMini
+from .wildtiger import WildTiger
 from .dukemtmcreid import DukeMTMCreID
 from .university1652 import University1652

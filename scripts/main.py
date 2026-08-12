@@ -16,14 +16,14 @@ from default_config import (
     get_default_config, lr_scheduler_kwargs
 )
 
-
+#实例化数据集加载器
 def build_datamanager(cfg):
     if cfg.data.type == 'image':
         return torchreid.data.ImageDataManager(**imagedata_kwargs(cfg))
     else:
         return torchreid.data.VideoDataManager(**videodata_kwargs(cfg))
 
-
+#构建训练引擎
 def build_engine(cfg, datamanager, model, optimizer, scheduler):
     if cfg.data.type == 'image':
         if cfg.loss.name == 'softmax':
@@ -186,14 +186,17 @@ def main():
         optimizer, **lr_scheduler_kwargs(cfg)
     )
 
+    # 判断是否开启断点续训 + 权重文件存在
     if cfg.model.resume and check_isfile(cfg.model.resume):
         cfg.train.start_epoch = resume_from_checkpoint(
             cfg.model.resume, model, optimizer=optimizer, scheduler=scheduler
         )
 
+    # 打印日志，提示当前使用的损失引擎+数据集类型
     print(
         'Building {}-engine for {}-reid'.format(cfg.loss.name, cfg.data.type)
     )
+    
     #构建训练引擎
     engine = build_engine(cfg, datamanager, model, optimizer, scheduler)
     #启动训练或测试
