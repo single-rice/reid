@@ -241,6 +241,7 @@ class ImageDataManager(DataManager):
 
         print('=> Loading train (source) dataset')
         trainset = []
+        source_datasets = []
         for name in self.sources:
             trainset_ = init_image_dataset(
                 name,
@@ -255,6 +256,7 @@ class ImageDataManager(DataManager):
                 market1501_500k=market1501_500k
             )
             trainset.append(trainset_)
+            source_datasets.append((name, trainset_))
         trainset = sum(trainset)
 
         self._num_train_pids = trainset.num_train_pids
@@ -276,6 +278,33 @@ class ImageDataManager(DataManager):
             pin_memory=self.use_gpu,
             drop_last=True
         )
+
+        # Optional supervised validation loaders. Existing datasets without a
+        # validation split are left untouched.
+        self.val_loader = {}
+        for name, source_dataset in source_datasets:
+            if not getattr(source_dataset, 'has_validation', False):
+                continue
+            valset = init_image_dataset(
+                name,
+                transform=self.transform_te,
+                mode='val',
+                combineall=False,
+                verbose=False,
+                root=root,
+                split_id=split_id,
+                cuhk03_labeled=cuhk03_labeled,
+                cuhk03_classic_split=cuhk03_classic_split,
+                market1501_500k=market1501_500k
+            )
+            self.val_loader[name] = torch.utils.data.DataLoader(
+                valset,
+                batch_size=batch_size_test,
+                shuffle=False,
+                num_workers=workers,
+                pin_memory=self.use_gpu,
+                drop_last=False
+            )
 
         self.train_loader_t = None
         if load_train_targets:

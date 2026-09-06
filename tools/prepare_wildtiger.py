@@ -28,13 +28,12 @@ def images_in(directory):
     )
 
 
-def split_counts(n):
-    # Largest-remainder allocation gives the closest integer 60/20/20 split.
-    raw = [0.6 * n, 0.2 * n, 0.2 * n]
-    counts = [int(value) for value in raw]
-    for index in sorted(range(3), key=lambda i: raw[i] - counts[i], reverse=True)[:n - sum(counts)]:
-        counts[index] += 1
-    return counts
+def split_train_val(images, rng):
+    shuffled = list(images)
+    rng.shuffle(shuffled)
+    val_count = max(1, int(round(0.2 * len(shuffled))))
+    val_count = min(val_count, len(shuffled) - 1)
+    return shuffled[val_count:], shuffled[:val_count]
 
 
 def copy_images(images, destination, tiger_id):
@@ -89,22 +88,30 @@ def main():
     rng = random.Random(args.seed)
     identities.sort(key=lambda item: item[0])
     rng.shuffle(identities)
-    n_train, n_val, _ = split_counts(len(identities))
-    partitions = {
-        'train': identities[:n_train],
-        'val': identities[n_train:n_train + n_val],
-        'test': identities[n_train + n_val:],
+    # 403 identities -> 323 train/validation identities and 80 held-out test
+    # identities. The explicit floor keeps the requested held-out set at 80.
+    n_test = int(0.2 * len(identities))
+    train_val_identities = identities[:-n_test]
+    test_identities = identities[-n_test:]
+
+    manifest = {
+        'seed': args.seed,
+        'ratios': {'train_val_ids': 0.8, 'test_ids': 0.2,
+                   'train_images': 0.8, 'val_images': 0.2},
+        'splits': {'train': [], 'val': [], 'test': []}
     }
+    for tiger_id, images in train_val_identities:
+        train_images, val_images = split_train_val(images, rng)
+        copy_images(train_images, destination / 'train' / tiger_id, tiger_id)
+        copy_images(val_images, destination / 'val' / tiger_id, tiger_id)
+        manifest['splits']['train'].append(
+            {'id': tiger_id, 'images': len(train_images)}
+        )
+        manifest['splits']['val'].append(
+            {'id': tiger_id, 'images': len(val_images)}
+        )
 
-    manifest = {'seed': args.seed, 'ratios': {'train': 0.6, 'val': 0.2, 'test': 0.2}, 'splits': {}}
-    for split in ('train', 'val'):
-        manifest['splits'][split] = []
-        for tiger_id, images in partitions[split]:
-            copy_images(images, destination / split / tiger_id, tiger_id)
-            manifest['splits'][split].append({'id': tiger_id, 'images': len(images)})
-
-    manifest['splits']['test'] = []
-    for tiger_id, images in partitions['test']:
+    for tiger_id, images in test_identities:
         query, gallery, video_counts = split_query_gallery(images, rng)
         copy_images(query, destination / 'test' / 'query' / tiger_id, tiger_id)
         copy_images(gallery, destination / 'test' / 'gallery' / tiger_id, tiger_id)
@@ -119,8 +126,8 @@ def main():
 
     with (destination / 'split.json').open('w', encoding='utf-8') as stream:
         json.dump(manifest, stream, ensure_ascii=False, indent=2)
-    print('Prepared {} identities: train={}, val={}, test={}'.format(
-        len(identities), len(partitions['train']), len(partitions['val']), len(partitions['test'])
+    print('Prepared {} identities: train/val={}, test={}'.format(
+        len(identities), len(train_val_identities), len(test_identities)
     ))
 
 

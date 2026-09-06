@@ -21,6 +21,7 @@ from .resnet_ibn_a import *
 from .resnet_ibn_b import *
 from .shufflenetv2 import *
 from .inceptionresnetv2 import *
+from .convnext import *
 
 __model_factory = {
     # image classification models
@@ -47,6 +48,10 @@ __model_factory = {
     'xception': xception,
     'resnet50_ibn_a': resnet50_ibn_a,
     'resnet50_ibn_b': resnet50_ibn_b,
+    'convnext_tiny': convnext_tiny,
+    'convnext_small': convnext_small,
+    'convnext_t': convnext_tiny,
+    'convnext_s': convnext_small,
     # lightweight models
     'nasnsetmobile': nasnetamobile,
     'mobilenetv2_x1_0': mobilenetv2_x1_0,
@@ -89,7 +94,7 @@ def show_avai_models():
 
 
 def build_model(
-    name, num_classes, loss='softmax', pretrained=True, use_gpu=True
+    name, num_classes, loss='softmax', pretrained=True, use_gpu=True, **kwargs
 ):
     """A function wrapper for building a model.
 
@@ -118,7 +123,7 @@ def build_model(
         num_classes=num_classes,
         loss=loss,
         pretrained=pretrained,
-        use_gpu=use_gpu
+        use_gpu=use_gpu,
+        **kwargs
     )
-
 

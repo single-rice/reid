@@ -158,6 +158,26 @@ class Engine(object):
             ranks (list, optional): cmc ranks to be computed. Default is [1, 5, 10, 20].
             rerank (bool, optional): uses person re-ranking (by Zhong et al. CVPR'17).
                 Default is False. This is only enabled when test_only=True.
+                统一的模型训练与评测流水线引擎
+
+            参数说明：
+                save_dir (str): 模型、日志、可视化结果保存目录
+                max_epoch (int): 完整训练总轮数
+                start_epoch (int, 可选): 训练起始轮次，用于断点续训，默认0
+                print_freq (int, 可选): 每隔多少batch打印一次训练loss/指标，默认10
+                fixbase_epoch (int, 可选): 两阶段迁移学习冻结骨干轮数；前fixbase_epoch轮仅训练open_layers指定新增层，骨干完全冻结；该轮次计入总max_epoch，默认0（不冻结骨干，全程全开训练）
+                open_layers (str / list, 可选): 解冻训练的新增层名称，如classifier、attn、neck，配合fixbase_epoch使用
+                start_eval (int, 可选): 从第几轮开始执行测试评估，默认0（每eval_freq轮都会测）
+                eval_freq (int, 可选): 每隔多少轮执行一次完整测试；默认-1，仅在全部训练结束后评测一次
+                test_only (bool, 可选): 仅执行测试，不进行训练；加载已有权重直接跑评测，默认False
+                dist_metric (str, 可选): 计算query与gallery特征距离的度量方式，默认euclidean（欧氏距离），可选cosine（余弦距离）
+                normalize_feature (bool, 可选): 提取特征后先做L2归一化再计算距离；开启后等价使用余弦距离，搭配cosine度量常用，默认False
+                visrank (bool, 可选): 可视化检索排序结果；建议test_only=True时开启，匹配图片保存至 save_dir/visrank_数据集名，默认False
+                visrank_topk (int, 可选): 可视化每个query前Top-k匹配图，默认10
+                use_metric_cuhk03 (bool, 可选): CUHK03数据集单图库评测协议；使用经典划分时必须开启，默认False
+                ranks (list, 可选): CMC曲线计算的Rank指标，默认[1,5,10,20]（Rank1/Rank5/Rank10/Rank20）
+                rerank (bool, 可选): 开启行人重排序算法（CVPR2017文章），大幅提升mAP指标；仅test_only=True时生效，默认False
+
         """
 
         if visrank and not test_only:
@@ -432,10 +452,14 @@ class Engine(object):
 
         return cmc[0], mAP
 
+    
     def compute_loss(self, criterion, outputs, targets):
+        # 判断模型输出是否是元组/列表（多分支、深度监督输出）
         if isinstance(outputs, (tuple, list)):
+        # 启用深度监督损失计算
             loss = DeepSupervision(criterion, outputs, targets)
         else:
+        # 单路输出，直接用损失函数计算损失
             loss = criterion(outputs, targets)
         return loss
 
