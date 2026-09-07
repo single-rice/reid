@@ -23,7 +23,7 @@ class Dataset(object):
             independently. If k_tfm > 1, the transform function will be
             applied k_tfm times to an image. This variable will only be
             useful for training and is currently valid for image datasets only.
-        mode (str): 'train', 'query' or 'gallery'.
+        mode (str): 'train', 'val', 'query' or 'gallery'.
         combineall (bool): combines train, query and gallery in a
             dataset for training.
         verbose (bool): show information.
@@ -64,6 +64,7 @@ class Dataset(object):
         mode='train',
         combineall=False,
         verbose=True,
+        val=None,
         **kwargs
     ):
         # extend 3-tuple (img_path(s), pid, camid) to
@@ -75,8 +76,13 @@ class Dataset(object):
             query = [(*items, 0) for items in query]
         if len(gallery[0]) == 3:
             gallery = [(*items, 0) for items in gallery]
+        if val is None:
+            val = []
+        elif val and len(val[0]) == 3:
+            val = [(*items, 0) for items in val]
 
         self.train = train
+        self.val = val
         self.query = query
         self.gallery = gallery
         self.transform = transform
@@ -94,6 +100,14 @@ class Dataset(object):
 
         if self.mode == 'train':
             self.data = self.train
+        elif self.mode == 'val':
+            if not self.val:
+                raise ValueError(
+                    '{} does not provide a validation split'.format(
+                        self.__class__.__name__
+                    )
+                )
+            self.data = self.val
         elif self.mode == 'query':
             self.data = self.query
         elif self.mode == 'gallery':
@@ -101,7 +115,7 @@ class Dataset(object):
         else:
             raise ValueError(
                 'Invalid mode. Got {}, but expected to be '
-                'one of [train | query | gallery]'.format(self.mode)
+                'one of [train | val | query | gallery]'.format(self.mode)
             )
 
         if self.verbose:
