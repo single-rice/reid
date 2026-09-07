@@ -65,6 +65,7 @@ class Dataset(object):
         combineall=False,
         verbose=True,
         val=None,
+        eval_group_by_path=None,
         **kwargs
     ):
         # extend 3-tuple (img_path(s), pid, camid) to
@@ -90,6 +91,9 @@ class Dataset(object):
         self.mode = mode
         self.combineall = combineall
         self.verbose = verbose
+        # Optional evaluation metadata is kept outside the canonical
+        # (img_path, pid, camid, dsetid) samples for backward compatibility.
+        self.eval_group_by_path = eval_group_by_path or {}
 
         self.num_train_pids = self.get_num_pids(self.train)
         self.num_train_cams = self.get_num_cams(self.train)
@@ -152,7 +156,8 @@ class Dataset(object):
                 transform=self.transform,
                 mode=self.mode,
                 combineall=False,
-                verbose=False
+                verbose=False,
+                eval_group_by_path=self.eval_group_by_path
             )
         else:
             return VideoDataset(
@@ -370,6 +375,9 @@ class ImageDataset(Dataset):
             'impath': img_path,
             'dsetid': dsetid
         }
+        eval_group = self.eval_group_by_path.get(img_path)
+        if eval_group is not None:
+            item['eval_group'] = eval_group
         return item
 
     def show_summary(self):

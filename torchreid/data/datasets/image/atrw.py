@@ -46,17 +46,36 @@ class ATRW(ImageDataset):
 
         train = self._read_split(self.train_csv, self.train_dir, relabel=True,
                                  default_camid=0)
-        query = self._read_split(self.query_csv, self.query_dir)
+        query, eval_group_by_path = self._read_split(
+            self.query_csv, self.query_dir, read_eval_group=True
+        )
         gallery = self._read_split(self.gallery_csv, self.gallery_dir)
-        super(ATRW, self).__init__(train, query, gallery, **kwargs)
+        super(ATRW, self).__init__(
+            train,
+            query,
+            gallery,
+            eval_group_by_path=eval_group_by_path,
+            **kwargs
+        )
 
     @staticmethod
-    def _read_split(csv_path, image_dir, relabel=False, default_camid=None):
+    def _read_split(
+        csv_path,
+        image_dir,
+        relabel=False,
+        default_camid=None,
+        read_eval_group=False
+    ):
         rows = []
-        with open(csv_path, 'r') as csv_file:
+        eval_group_by_path = {}
+        with open(csv_path, 'r', encoding='utf-8', newline='') as csv_file:
             reader = csv.DictReader(csv_file)
-            if reader.fieldnames is None or not {'pid', 'image'}.issubset(reader.fieldnames):
-                raise RuntimeError('Invalid ATRW split file: {}'.format(csv_path))
+            if reader.fieldnames is None or not {
+                'pid', 'image'
+            }.issubset(reader.fieldnames):
+                raise RuntimeError(
+                    'Invalid ATRW split file: {}'.format(csv_path)
+                )
             for row in reader:
                 pid = int(row['pid'])
                 if 'camid' in row and row['camid'].strip():
@@ -64,16 +83,44 @@ class ATRW(ImageDataset):
                 elif default_camid is not None:
                     camid = default_camid
                 else:
-                    raise RuntimeError('Missing camid in ATRW split: {}'.format(csv_path))
+                    raise RuntimeError(
+                        'Missing camid in ATRW split: {}'.format(csv_path)
+                    )
                 image_path = osp.join(image_dir, row['image'].strip())
                 if not osp.isfile(image_path):
-                    raise RuntimeError('ATRW image not found: {}'.format(image_path))
+                    raise RuntimeError(
+                        'ATRW image not found: {}'.format(image_path)
+                    )
                 rows.append((image_path, pid, camid))
+                if read_eval_group:
+                    if 'query' not in row or not row['query'].strip():
+                        raise RuntimeError(
+                            'Missing query group in ATRW split: {}'.format(
+                                csv_path
+                            )
+                        )
+                    eval_group = row['query'].strip().lower()
+                    if eval_group not in {'sing', 'multi'}:
+                        raise RuntimeError(
+                            'Invalid query group "{}" in {}'.format(
+                                eval_group, csv_path
+                            )
+                        )
+                    eval_group_by_path[image_path] = eval_group
 
         if not rows:
             raise RuntimeError('ATRW split is empty: {}'.format(csv_path))
 
         pid2label = {}
         if relabel:
-            pid2label = {pid: label for label, pid in enumerate(sorted({x[1] for x in rows}))}
-        return [(path, pid2label.get(pid, pid), camid) for path, pid, camid in rows]
+            pid2label = {
+                pid: label
+                for label, pid in enumerate(sorted({x[1] for x in rows}))
+            }
+        data = [
+            (path, pid2label.get(pid, pid), camid)
+            for path, pid, camid in rows
+        ]
+        if read_eval_group:
+            return data, eval_group_by_path
+        return data

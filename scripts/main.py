@@ -135,7 +135,9 @@ def main():
     cfg.use_gpu = torch.cuda.is_available()
     #合并 YAML 配置
     if args.config_file:
-        cfg.merge_from_file(args.config_file)
+        # 显式使用 UTF-8，确保带中文注释的配置在 Windows 下也能读取。
+        with open(args.config_file, 'r', encoding='utf-8') as config_file:
+            cfg.merge_from_other_cfg(cfg.load_cfg(config_file))
     reset_config(cfg, args)
     #合并命令行覆盖参数
     cfg.merge_from_list(args.opts)

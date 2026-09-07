@@ -69,15 +69,25 @@ class WildTiger(ImageDataset):
             pid2label,
             'val'
         )
-        query = self._read_rows(self.query_csv, self.query_dir)
+        query, eval_group_by_path = self._read_rows(
+            self.query_csv, self.query_dir, read_eval_group=True
+        )
         gallery = self._read_rows(self.gallery_csv, self.gallery_dir)
         super(WildTiger, self).__init__(
-            train, query, gallery, val=val, **kwargs
+            train,
+            query,
+            gallery,
+            val=val,
+            eval_group_by_path=eval_group_by_path,
+            **kwargs
         )
 
     @staticmethod
-    def _read_rows(csv_path, image_dir, default_camid=None):
+    def _read_rows(
+        csv_path, image_dir, default_camid=None, read_eval_group=False
+    ):
         rows = []
+        eval_group_by_path = {}
         with open(csv_path, 'r', encoding='utf-8', newline='') as stream:
             reader = csv.DictReader(stream)
             if reader.fieldnames is None or not {
@@ -102,9 +112,26 @@ class WildTiger(ImageDataset):
                         'WildTiger image not found: {}'.format(image_path)
                     )
                 rows.append((image_path, pid, camid))
+                if read_eval_group:
+                    if 'query' not in row or not row['query'].strip():
+                        raise RuntimeError(
+                            'Missing query group in WildTiger split: {}'.format(
+                                csv_path
+                            )
+                        )
+                    eval_group = row['query'].strip().lower()
+                    if eval_group not in {'sing', 'multi'}:
+                        raise RuntimeError(
+                            'Invalid query group "{}" in {}'.format(
+                                eval_group, csv_path
+                            )
+                        )
+                    eval_group_by_path[image_path] = eval_group
 
         if not rows:
             raise RuntimeError('WildTiger split is empty: {}'.format(csv_path))
+        if read_eval_group:
+            return rows, eval_group_by_path
         return rows
 
     @staticmethod

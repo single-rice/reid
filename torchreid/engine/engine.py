@@ -15,6 +15,55 @@ from torchreid.utils import (
 )
 from torchreid.losses import DeepSupervision
 
+
+def evaluate_rank_by_query_group(
+    distmat,
+    q_pids,
+    g_pids,
+    q_camids,
+    g_camids,
+    q_groups,
+    use_metric_cuhk03=False
+):
+    """Evaluates query groups against one shared, complete gallery."""
+    q_groups = np.asarray(q_groups)
+    if q_groups.shape[0] != distmat.shape[0]:
+        raise ValueError(
+            'Expected one evaluation group per query, but got {} groups for '
+            '{} queries'.format(q_groups.shape[0], distmat.shape[0])
+        )
+    unknown_groups = set(np.unique(q_groups)) - {'sing', 'multi'}
+    if unknown_groups:
+        raise ValueError(
+            'Unknown evaluation query groups: {}'.format(
+                ', '.join(sorted(unknown_groups))
+            )
+        )
+
+    results = OrderedDict()
+    for result_name, group_value in (
+        ('single_video', 'sing'),
+        ('cross_video', 'multi')
+    ):
+        mask = q_groups == group_value
+        if not np.any(mask):
+            continue
+        cmc, mAP = metrics.evaluate_rank(
+            distmat[mask],
+            q_pids[mask],
+            g_pids,
+            q_camids[mask],
+            g_camids,
+            use_metric_cuhk03=use_metric_cuhk03
+        )
+        results[result_name] = {
+            'num_queries': int(mask.sum()),
+            'num_entities': int(np.unique(q_pids[mask]).size),
+            'cmc': cmc,
+            'mAP': mAP
+        }
+    return results
+
 #负责训练循环、测试流程、特征提取、保存模型
 class Engine(object):
     r"""A generic base Engine class for both image- and video-reid.
@@ -32,6 +81,7 @@ class Engine(object):
         self.use_gpu = (torch.cuda.is_available() and use_gpu)
         self.writer = None
         self.epoch = 0
+        self.test_results = OrderedDict()
 
         self.model = None
         self.optimizer = None
@@ -358,6 +408,19 @@ class Engine(object):
             if self.writer is not None:
                 self.writer.add_scalar(f'Test/{name}/rank1', rank1, self.epoch)
                 self.writer.add_scalar(f'Test/{name}/mAP', mAP, self.epoch)
+                for group_name, result in self.test_results[name].items():
+                    if group_name == 'overall':
+                        continue
+                    self.writer.add_scalar(
+                        f'Test/{name}/{group_name}/rank1',
+                        result['cmc'][0],
+                        self.epoch
+                    )
+                    self.writer.add_scalar(
+                        f'Test/{name}/{group_name}/mAP',
+                        result['mAP'],
+                        self.epoch
+                    )
 
         return rank1
 
@@ -379,7 +442,8 @@ class Engine(object):
         batch_time = AverageMeter()
 
         def _feature_extraction(data_loader):
-            f_, pids_, camids_ = [], [], []
+            f_, pids_, camids_, groups_ = [], [], [], []
+            has_groups = None
             for batch_idx, data in enumerate(data_loader):
                 imgs, pids, camids = self.parse_data_for_eval(data)
                 if self.use_gpu:
@@ -391,17 +455,29 @@ class Engine(object):
                 f_.append(features)
                 pids_.extend(pids.tolist())
                 camids_.extend(camids.tolist())
+                batch_groups = data.get('eval_group')
+                batch_has_groups = batch_groups is not None
+                if has_groups is None:
+                    has_groups = batch_has_groups
+                elif has_groups != batch_has_groups:
+                    raise RuntimeError(
+                        'Evaluation group metadata is missing from part of '
+                        'the data loader'
+                    )
+                if batch_has_groups:
+                    groups_.extend(batch_groups)
             f_ = torch.cat(f_, 0)
             pids_ = np.asarray(pids_)
             camids_ = np.asarray(camids_)
-            return f_, pids_, camids_
+            groups_ = np.asarray(groups_) if has_groups else None
+            return f_, pids_, camids_, groups_
 
         print('Extracting features from query set ...')
-        qf, q_pids, q_camids = _feature_extraction(query_loader)
+        qf, q_pids, q_camids, q_groups = _feature_extraction(query_loader)
         print('Done, obtained {}-by-{} matrix'.format(qf.size(0), qf.size(1)))
 
         print('Extracting features from gallery set ...')
-        gf, g_pids, g_camids = _feature_extraction(gallery_loader)
+        gf, g_pids, g_camids, _ = _feature_extraction(gallery_loader)
         print('Done, obtained {}-by-{} matrix'.format(gf.size(0), gf.size(1)))
 
         print('Speed: {:.4f} sec/batch'.format(batch_time.avg))
@@ -438,6 +514,38 @@ class Engine(object):
         print('CMC curve')
         for r in ranks:
             print('Rank-{:<3}: {:.1%}'.format(r, cmc[r - 1]))
+
+        dataset_results = OrderedDict()
+        dataset_results['overall'] = {
+            'num_queries': int(len(q_pids)),
+            'num_entities': int(np.unique(q_pids).size),
+            'cmc': cmc,
+            'mAP': mAP
+        }
+        if q_groups is not None:
+            group_results = evaluate_rank_by_query_group(
+                distmat,
+                q_pids,
+                g_pids,
+                q_camids,
+                g_camids,
+                q_groups,
+                use_metric_cuhk03=use_metric_cuhk03
+            )
+            dataset_results.update(group_results)
+            for group_name, result in group_results.items():
+                print('** {} Results ({} queries, {} entities) **'.format(
+                    group_name.replace('_', '-').title(),
+                    result['num_queries'],
+                    result['num_entities']
+                ))
+                print('mAP: {:.1%}'.format(result['mAP']))
+                print('CMC curve')
+                for r in ranks:
+                    print('Rank-{:<3}: {:.1%}'.format(
+                        r, result['cmc'][r - 1]
+                    ))
+        self.test_results[dataset_name] = dataset_results
 
         if visrank:
             visualize_ranked_results(
