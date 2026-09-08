@@ -7,7 +7,7 @@ from torch.utils.data.sampler import Sampler, RandomSampler, SequentialSampler
 
 AVAI_SAMPLERS = [
     'RandomIdentitySampler', 'SequentialSampler', 'RandomSampler',
-    'RandomDomainSampler', 'RandomDatasetSampler'
+    'RandomDomainSampler', 'RandomDatasetSampler', 'RandomIdentityVideoSampler'
 ]
 
 
@@ -86,6 +86,68 @@ class RandomIdentitySampler(Sampler):
 
     def __len__(self):
         return self.length
+
+
+class RandomIdentityVideoSampler(RandomIdentitySampler):
+    """Use camid as video ID within each identity.
+
+    Identity chunk quotas match RandomIdentitySampler, without replenishment.
+    With the configured probability, reserve one identity slot for an available
+    multi-video identity. Other slots are sampled normally. Multi-video chunks
+    always draw equally (within one image) from two randomly selected videos.
+    The reservation is best effort once multi-video quotas are exhausted.
+    """
+
+    def __init__(self, data_source, batch_size, num_instances,
+                 video_batch_probability=0.5):
+        if num_instances < 2 or batch_size % num_instances:
+            raise ValueError('Require num_instances >= 2 and divisible batch_size')
+        if batch_size // num_instances < 2:
+            raise ValueError('Triplet batches require at least two identities')
+        if not 0 <= video_batch_probability <= 1:
+            raise ValueError('video_batch_probability must be in [0, 1]')
+        super().__init__(data_source, batch_size, num_instances)
+        self.video_batch_probability = video_batch_probability
+        self.videos = defaultdict(lambda: defaultdict(list))
+        for index, item in enumerate(data_source):
+            self.videos[item[1]][item[2]].append(index)
+
+    def __iter__(self):
+        chunks = {}
+        for pid, indices in self.index_dic.items():
+            indices = list(indices)
+            random.shuffle(indices)
+            count = max(1, len(indices) // self.num_instances)
+            chunks[pid] = []
+            for chunk in range(count):
+                videos = self.videos[pid]
+                if len(videos) >= 2:
+                    chosen = random.sample(list(videos), 2)
+                    group = []
+                    for i, video in enumerate(chosen):
+                        size = self.num_instances // 2 + (i < self.num_instances % 2)
+                        pool = videos[video]
+                        group.extend(random.sample(pool, min(size, len(pool))))
+                        if size > len(pool):
+                            group.extend(random.choices(pool, k=size - len(pool)))
+                else:
+                    group = indices[chunk * self.num_instances:(chunk + 1) * self.num_instances]
+                    group += random.choices(indices, k=self.num_instances - len(group))
+                chunks[pid].append(group)
+        available = list(self.pids)
+        result = []
+        while len(available) >= self.num_pids_per_batch:
+            multi = [pid for pid in available if len(self.videos[pid]) >= 2]
+            chosen = []
+            if multi and random.random() < self.video_batch_probability:
+                chosen.append(random.choice(multi))
+            chosen += random.sample([pid for pid in available if pid not in chosen],
+                                    self.num_pids_per_batch - len(chosen))
+            for pid in chosen:
+                result.extend(chunks[pid].pop())
+                if not chunks[pid]:
+                    available.remove(pid)
+        return iter(result)
 
 
 class RandomDomainSampler(Sampler):
@@ -271,6 +333,11 @@ def build_train_sampler(
 
     if train_sampler == 'RandomIdentitySampler':#按行人身份采样（ReID三元组训练标配）
         sampler = RandomIdentitySampler(data_source, batch_size, num_instances)
+
+    elif train_sampler == 'RandomIdentityVideoSampler':
+        sampler = RandomIdentityVideoSampler(
+            data_source, batch_size, num_instances,
+            kwargs.get('video_batch_probability', 0.5))
 
     elif train_sampler == 'RandomDomainSampler':
         sampler = RandomDomainSampler(data_source, batch_size, num_cams)

@@ -1,7 +1,7 @@
 from __future__ import division, print_function, absolute_import
 
 from torchreid import metrics
-from torchreid.losses import TripletLoss, CrossEntropyLoss
+from torchreid.losses import TripletLoss, CrossEntropyLoss, CrossVideoTripletLoss
 
 from ..engine import Engine
 
@@ -69,7 +69,8 @@ class ImageTripletEngine(Engine):
         weight_x=1,
         scheduler=None,
         use_gpu=True,
-        label_smooth=True
+        label_smooth=True,
+        weight_cv=0.
     ):
         super(ImageTripletEngine, self).__init__(datamanager, use_gpu)
 
@@ -78,8 +79,10 @@ class ImageTripletEngine(Engine):
         self.scheduler = scheduler
         self.register_model('model', model, optimizer, scheduler)
 
-        assert weight_t >= 0 and weight_x >= 0
-        assert weight_t + weight_x > 0
+        assert weight_t >= 0 and weight_x >= 0 and weight_cv >= 0
+        assert weight_t + weight_x + weight_cv > 0
+        self.weight_cv = weight_cv
+        self.criterion_cv = CrossVideoTripletLoss(margin=margin)
         self.weight_t = weight_t
         self.weight_x = weight_x
 
@@ -106,6 +109,16 @@ class ImageTripletEngine(Engine):
             loss_t = self.compute_loss(self.criterion_t, features, pids)
             loss += self.weight_t * loss_t
             loss_summary['loss_t'] = loss_t.item()
+
+        if self.weight_cv > 0:
+            camids = data['camid'].to(pids.device)
+            loss_cv = self.compute_loss(
+                lambda feature, target: self.criterion_cv(feature, target, camids),
+                features, pids)
+            loss += self.weight_cv * loss_cv
+            loss_summary['loss_cv'] = loss_cv.item()
+            cross_positive = pids[:, None].eq(pids[None, :]) & camids[:, None].ne(camids[None, :])
+            loss_summary['cross_video_anchor_fraction'] = cross_positive.any(1).float().mean().item()
 
         if self.weight_x > 0:
             loss_x = self.compute_loss(self.criterion_x, outputs, pids)

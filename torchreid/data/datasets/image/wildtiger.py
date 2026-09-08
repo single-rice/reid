@@ -27,6 +27,7 @@ class WildTiger(ImageDataset):
     多视频身份：30
     单视频身份：50
     合计：80
+    - 训练集 323 个身份中，只有 29 个身份包含多个视频，另外 294 个身份只有单视频。
     """
 
     dataset_dir = 'Wild_Tiger'

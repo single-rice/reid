@@ -42,6 +42,7 @@ def build_engine(cfg, datamanager, model, optimizer, scheduler):
                 model,
                 optimizer=optimizer,
                 margin=cfg.loss.triplet.margin,
+                weight_cv=cfg.loss.triplet.weight_cv,
                 weight_t=cfg.loss.triplet.weight_t,
                 weight_x=cfg.loss.triplet.weight_x,
                 scheduler=scheduler,

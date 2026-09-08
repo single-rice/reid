@@ -1,18 +1,45 @@
 from __future__ import absolute_import
 
 import random
+import csv
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tools.prepare_wildtiger import (
     build_test_records,
     split_identities,
     split_query_gallery,
     video_names,
+    main,
 )
 
 
 class WildTigerPreparationTest(unittest.TestCase):
+
+    def test_generated_training_video_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / 'source'
+            for pid in range(3):
+                folder = source / ('tiger_%03d' % pid)
+                folder.mkdir(parents=True)
+                for video in range(2):
+                    for frame in range(5):
+                        (folder / ('video_%03d_%03d.jpg' % (video, frame))).touch()
+            destination = root / 'prepared'
+            argv = ['prepare', '--source', str(source), '--destination', str(destination),
+                    '--test-multi-ids', '0', '--test-single-ids', '0']
+            with mock.patch('sys.argv', argv):
+                main()
+            for split in ('train', 'val'):
+                with (destination / (split + '.csv')).open(newline='') as stream:
+                    rows = list(csv.DictReader(stream))
+                self.assertTrue(rows)
+                for row in rows:
+                    self.assertIn(row['video_id'], row['image'])
+                    self.assertEqual(int(row['camid']), int(row['video_id'].split('_')[1]) + 1)
 
     @staticmethod
     def identity(name, videos, images_per_video=3):

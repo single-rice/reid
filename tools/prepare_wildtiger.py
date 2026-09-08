@@ -135,7 +135,7 @@ def write_csv(path, rows, test_split=False):
         if test_split:
             writer.writerow(['pid', 'image', 'camid', 'query'])
         else:
-            writer.writerow(['pid', 'image'])
+            writer.writerow(['pid', 'image', 'camid', 'video_id'])
         writer.writerows(rows)
 
 
@@ -207,8 +207,14 @@ def main():
             val_images, destination / 'val' / tiger_id, tiger_id
         )
         pid = tiger_pid(tiger_id)
-        train_rows.extend((pid, name) for name in train_names)
-        val_rows.extend((pid, name) for name in val_names)
+        video2camid = {video: i + 1 for i, video in enumerate(sorted(video_names(images)))}
+        for split_images, names, rows in (
+            (train_images, train_names, train_rows),
+            (val_images, val_names, val_rows),
+        ):
+            for image, name in zip(split_images, names):
+                video = VIDEO_PATTERN.search(image.stem).group(1).lower()
+                rows.append((pid, name, video2camid[video], video))
         manifest['splits']['train'].append(
             {'id': tiger_id, 'images': len(train_images)}
         )

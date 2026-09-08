@@ -46,3 +46,26 @@ class TripletLoss(nn.Module):
         # Compute ranking hinge loss
         y = torch.ones_like(dist_an)
         return self.ranking_loss(dist_an, dist_ap, y)
+
+
+class CrossVideoTripletLoss(nn.Module):
+    """Batch-hard loss averaged only over anchors with valid cross-video pairs."""
+
+    def __init__(self, margin=0.3):
+        super().__init__()
+        self.margin = margin
+
+    def forward(self, inputs, targets, camids):
+        same_pid = targets[:, None].eq(targets[None, :])
+        positive = same_pid & camids[:, None].ne(camids[None, :])
+        negative = ~same_pid
+        valid = positive.any(dim=1) & negative.any(dim=1)
+        if not valid.any():
+            return inputs.sum() * 0
+        dist = (inputs.square().sum(1)[:, None]
+                + inputs.square().sum(1)[None, :]
+                - 2 * inputs @ inputs.t()).clamp(min=1e-12).sqrt()
+        hardest_positive = dist.masked_fill(~positive, float('-inf')).max(1).values
+        hardest_negative = dist.masked_fill(~negative, float('inf')).min(1).values
+        return (hardest_positive[valid] - hardest_negative[valid]
+                + self.margin).clamp(min=0).mean()

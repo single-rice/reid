@@ -223,6 +223,7 @@ class ImageDataManager(DataManager):
         num_datasets=1,
         train_sampler='RandomSampler',
         train_sampler_t='RandomSampler',
+        video_batch_probability=0.5,
         cuhk03_labeled=False,
         cuhk03_classic_split=False,
         market1501_500k=False
@@ -267,6 +268,7 @@ class ImageDataManager(DataManager):
             sampler=build_train_sampler(
                 trainset.train,
                 train_sampler,
+                video_batch_probability=video_batch_probability,
                 batch_size=batch_size_train,
                 num_instances=num_instances,
                 num_cams=num_cams,
@@ -335,6 +337,7 @@ class ImageDataManager(DataManager):
                 sampler=build_train_sampler(
                     trainset_t.train,
                     train_sampler_t,
+                    video_batch_probability=video_batch_probability,
                     batch_size=batch_size_train,
                     num_instances=num_instances,
                     num_cams=num_cams,

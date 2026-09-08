@@ -11,7 +11,7 @@ data:
   root: 'reid-data'            # 数据集根目录，程序将在其下寻找 Wild_Tiger
   sources: ['wildtiger']       # 训练源数据集；使用 WildTiger 的 train 划分训练
   targets: ['wildtiger']       # 测试目标数据集；使用 WildTiger 的 query/gallery 评估
-  workers: 4                   # DataLoader 后台工作进程数；Windows 异常时可改为 0
+  workers: 8                   # DataLoader 后台工作进程数；Windows 异常时可改为 0
   split_id: 0                  # 数据划分编号；WildTiger 当前只有一套固定划分
   height: 128                  # 输入图像高度；适配横向虎体图像
   width: 256                   # 输入图像宽度；保留虎体横向条纹区域
@@ -44,7 +44,7 @@ train:
   weight_decay: 0.0005         # L2 权重衰减系数，用于抑制过拟合
   max_epoch: 100                # 总训练轮数
   start_epoch: 0               # 从第 0 轮开始；恢复训练时由检查点更新
-  batch_size: 32               # 每个训练批次包含 32 张图片
+  batch_size: 128               # 每个训练批次包含 128 张图片
   fixbase_epoch: 12            # 前 12 轮冻结主干，只训练 open_layers 指定层
   open_layers: ['fc', 'classifier']  # 冻结阶段允许更新 512 维特征层和身份分类器
   staged_lr: False             # 不为主干与新层设置不同学习率
@@ -59,12 +59,12 @@ train:
 
 # 测试与检索评估设置
 test:
-  batch_size: 100              # 特征提取阶段每个批次处理 100 张图片
+  batch_size: 128              # 特征提取阶段每个批次处理 128 张图片
   dist_metric: 'euclidean'     # 使用欧氏距离计算 query 与 gallery 特征距离
   normalize_feature: False     # 计算距离前不对特征做 L2 归一化
   ranks: [1, 5, 10, 20]       # 输出 CMC 的 Rank-1、5、10、20 指标
   evaluate: False              # False 表示训练后评估；True 表示只加载权重进行测试
-  eval_freq: -1                # 不在训练中周期性测试，只在训练结束后测试一次
+  eval_freq: -1                # -1表示不在训练中周期性测试，只在训练结束后测试一次
   start_eval: 0                # 允许开始周期评估的轮次；eval_freq=-1 时不生效
   rerank: False                # 不启用重排序，报告原始模型检索性能
   visrank: False               # 不生成检索排序可视化；正式数值基线默认关闭

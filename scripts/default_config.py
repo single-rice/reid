@@ -39,6 +39,7 @@ def get_default_config():
 
     # sampler
     cfg.sampler = CN()
+    cfg.sampler.video_batch_probability = 0.5
     cfg.sampler.train_sampler = 'RandomSampler' # sampler for source train loader
     cfg.sampler.train_sampler_t = 'RandomSampler' # sampler for target train loader
     cfg.sampler.num_instances = 4 # number of instances per identity for RandomIdentitySampler
@@ -89,6 +90,7 @@ def get_default_config():
     cfg.loss.softmax = CN()
     cfg.loss.softmax.label_smooth = True # use label smoothing regularizer
     cfg.loss.triplet = CN()
+    cfg.loss.triplet.weight_cv = 0.
     cfg.loss.triplet.margin = 0.3 # distance margin
     cfg.loss.triplet.weight_t = 1. # weight to balance hard triplet loss
     cfg.loss.triplet.weight_x = 0. # weight to balance cross entropy loss
@@ -132,6 +134,7 @@ def imagedata_kwargs(cfg):
         'num_datasets': cfg.sampler.num_datasets,
         'train_sampler': cfg.sampler.train_sampler,
         'train_sampler_t': cfg.sampler.train_sampler_t,
+        'video_batch_probability': cfg.sampler.video_batch_probability,
         # image dataset specific
         'cuhk03_labeled': cfg.cuhk03.labeled_images,
         'cuhk03_classic_split': cfg.cuhk03.classic_split,
