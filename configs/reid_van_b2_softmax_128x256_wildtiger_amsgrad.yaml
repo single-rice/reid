@@ -1,0 +1,71 @@
+# 模型设置
+model:
+  name: 'van_b2'       # 标准 VAN-B2，512 维原生特征
+  pretrained: True             # 使用 ImageNet 预训练权重初始化主干网络
+  load_weights: ''             # 仅加载指定模型权重；空字符串表示从预训练模型开始训练
+  resume: ''                   # 从完整检查点恢复训练；空字符串表示不恢复优化器和训练轮次
+
+# 数据集与图像预处理设置
+data:
+  type: 'image'                # 数据类型为图像 ReID，而不是视频轨迹 ReID
+  root: 'reid-data'            # 数据集根目录，程序将在其下寻找 Wild_Tiger
+  sources: ['wildtiger']       # 训练源数据集；使用 WildTiger 的 train 划分训练
+  targets: ['wildtiger']       # 测试目标数据集；使用 WildTiger 的 query/gallery 评估
+  workers: 8                   # DataLoader 后台工作进程数；Windows 异常时可改为 0
+  split_id: 0                  # 数据划分编号；WildTiger 当前只有一套固定划分
+  height: 128                  # 输入图像高度；适配横向虎体图像
+  width: 256                   # 输入图像宽度；保留虎体横向条纹区域
+  combineall: False            # 不把 query/gallery 合入训练集，防止测试身份泄漏
+  transforms: ['color_jitter', 'random_erase']  # 训练增强：轻度颜色扰动和随机遮挡，不做水平翻转
+  k_tfm: 1                    # 每张训练图片只生成一个增强版本
+  norm_mean: [0.485, 0.456, 0.406]  # ImageNet 预训练模型使用的 RGB 均值
+  norm_std: [0.229, 0.224, 0.225]   # ImageNet 预训练模型使用的 RGB 标准差
+  save_dir: 'log/reid_van_b2_softmax_128x256_wildtiger_amsgrad'  # 当前模型独立的日志与检查点目录
+  load_train_targets: False    # 不额外加载目标域训练数据；本实验不是无监督域适应
+
+# 训练批次采样设置
+sampler:
+  train_sampler: 'RandomSampler'    # Softmax 基线使用普通随机采样器
+  train_sampler_t: 'RandomSampler'  # 目标域训练加载器的采样器；当前未启用，仅保留默认值
+  num_instances: 4             # 身份采样器每个 ID 的图片数；RandomSampler 下不生效
+  num_cams: 1                  # 相机域采样数量；RandomSampler 下不生效
+  num_datasets: 1              # 多数据集采样数量；当前只有 WildTiger 一个训练集
+
+# 损失函数设置
+loss:
+  name: 'softmax'              # 使用身份分类交叉熵损失，不启用 Triplet Loss
+  softmax:
+    label_smooth: True         # 启用标签平滑，降低过拟合和过度置信
+
+# 训练过程与优化器设置
+train:
+  optim: 'amsgrad'             # 使用 AMSGrad，即带最大二阶矩约束的 Adam 变体
+  lr: 0.0003                   # 初始学习率
+  weight_decay: 0.0005         # L2 权重衰减系数，用于抑制过拟合
+  max_epoch: 100                # 总训练轮数
+  start_epoch: 0               # 从第 0 轮开始；恢复训练时由检查点更新
+  batch_size: 128               # 每个训练批次包含 128 张图片
+  fixbase_epoch: 12            # 前 12 轮冻结主干，只训练 open_layers 指定层
+  open_layers: ['head']  # 冻结主干阶段仅训练本模型的分类头
+  staged_lr: False             # 不为主干与新层设置不同学习率
+  new_layers: ['head']   # staged_lr 启用时使用基础学习率的分类头
+  base_lr_mult: 0.1            # staged_lr 启用时主干学习率为基础学习率的 0.1 倍
+  lr_scheduler: 'cosine'       # 使用余弦退火，在 100 轮内平滑降低学习率
+  # lr_scheduler: 'single_step'  # 备选方案：在指定轮次阶梯式降低学习率
+  # stepsize: [20]               # single_step 的降学习率轮次；cosine 下不生效
+  gamma: 0.1                   # 阶梯调度的学习率衰减倍率；cosine 下不生效
+  print_freq: 20               # 每训练 20 个 batch 输出一次日志
+  seed: 42                     # 固定随机种子，便于复现实验
+
+# 测试与检索评估设置
+test:
+  batch_size: 128              # 特征提取阶段每个批次处理 128 张图片
+  dist_metric: 'euclidean'     # 使用欧氏距离计算 query 与 gallery 特征距离
+  normalize_feature: False     # 计算距离前不对特征做 L2 归一化
+  ranks: [1, 5, 10, 20]       # 输出 CMC 的 Rank-1、5、10、20 指标
+  evaluate: False              # False 表示训练后评估；True 表示只加载权重进行测试
+  eval_freq: -1                # -1表示不在训练中周期性测试，只在训练结束后测试一次
+  start_eval: 0                # 允许开始周期评估的轮次；eval_freq=-1 时不生效
+  rerank: False                # 不启用重排序，报告原始模型检索性能
+  visrank: False               # 不生成检索排序可视化；正式数值基线默认关闭
+  visrank_topk: 10             # 启用 visrank 时展示每个 query 的前 10 个结果

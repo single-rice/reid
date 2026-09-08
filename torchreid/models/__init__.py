@@ -22,9 +22,23 @@ from .resnet_ibn_b import *
 from .shufflenetv2 import *
 from .inceptionresnetv2 import *
 from .convnext import *
+from .van import *
+from .efficientnet import *
+from .vit import *
+from .swin_transformer import *
+from .conformer import *
 
 __model_factory = {
     # image classification models
+    'van_b0': van_b0,
+    'van_b1': van_b1,
+    'van_b2': van_b2,
+    'van_b3': van_b3,
+    'efficientnet_b0': efficientnet_b0,
+    'vit_b_16': vit_b_16,
+    'swin_t': swin_t,
+    'swin_s': swin_s,
+    'conformer_base_patch16': conformer_base_patch16,
     'resnet18': resnet18,
     'resnet34': resnet34,
     'resnet50': resnet50,
@@ -126,4 +140,3 @@ def build_model(
         use_gpu=use_gpu,
         **kwargs
     )
-

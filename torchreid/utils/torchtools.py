@@ -211,6 +211,11 @@ def open_specified_layers(model, open_layers):
             layer
         )
 
+    # Parameters registered directly on the model (e.g. ViT/Conformer CLS
+    # tokens) are not visited by named_children(). Freeze those as well.
+    for parameter in model.parameters():
+        parameter.requires_grad = False
+
     for name, module in model.named_children():
         if name in open_layers:
             module.train()
